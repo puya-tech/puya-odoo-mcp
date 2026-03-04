@@ -1,0 +1,65 @@
+roles:
+  vendedor:
+    models:
+      res.partner:
+        operations: [search_read]
+        fields_denied: [credit_limit, property_payment_term_id, property_supplier_payment_term_id]
+        domain_filter: "[('user_id', '=', {uid})]"
+      sale.order:
+        operations: [search_read]
+        fields_denied: []
+        domain_filter: "[('user_id', '=', {uid})]"
+      sale.order.line:
+        operations: [search_read]
+      product.product:
+        operations: [search_read]
+        fields_denied: [standard_price, seller_ids]
+      product.template:
+        operations: [search_read]
+        fields_denied: [standard_price, seller_ids]
+      account.move:
+        operations: [search_read]
+        domain_filter: "[('invoice_user_id', '=', {uid})]"
+    methods_allowed: []
+    blocked_models: [ir.config_parameter, res.users, ir.rule, ir.model.access]
+    rate_limit: 60
+
+  administrativo:
+    models:
+      res.partner:
+        operations: [search_read, write, create]
+      sale.order:
+        operations: [search_read, write, create]
+      sale.order.line:
+        operations: [search_read, write, create]
+      account.move:
+        operations: [search_read, write, create]
+      account.payment:
+        operations: [search_read, write, create]
+      stock.picking:
+        operations: [search_read, write]
+      stock.move:
+        operations: [search_read]
+      stock.quant:
+        operations: [search_read]
+      product.product:
+        operations: [search_read, write]
+        fields_denied: [standard_price]
+      product.template:
+        operations: [search_read, write]
+        fields_denied: [standard_price]
+      purchase.order:
+        operations: [search_read]
+    methods_allowed:
+      - "sale.order:action_confirm"
+      - "account.move:action_post"
+      - "account.payment:action_post"
+    blocked_models: [ir.config_parameter, res.users, ir.rule, ir.model.access, base.automation]
+    rate_limit: 120
+
+  developer:
+    models:
+      "*":
+        operations: [search_read, write, create, unlink]
+    methods_allowed: ["*"]
+    rate_limit: 300
