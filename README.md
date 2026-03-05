@@ -18,34 +18,34 @@ cd puya-odoo-mcp
 pip install -e .
 ```
 
-### Environment variables
+### Configure credentials
+
+Create the credentials file (keeps the API key hidden from Claude Code):
 
 ```bash
-export ODOO_URL="https://costasurmat.odoo.com"
-export ODOO_DB="costasurmat-main-12345678"
-export ODOO_API_KEY="your-api-key-here"
+mkdir -p ~/.config/puya-odoo-mcp
+cat > ~/.config/puya-odoo-mcp/credentials << 'EOF'
+ODOO_URL=https://cmcorpcl-puyacentro.odoo.com
+ODOO_DB=cmcorpcl-costasurmat-main-7982838
+ODOO_API_KEY=your-api-key-here
+EOF
+chmod 600 ~/.config/puya-odoo-mcp/credentials
 ```
+
+The credentials file is read by the MCP server at startup. Claude Code never sees the API key.
+
+Alternatively, env vars (`ODOO_URL`, `ODOO_DB`, `ODOO_API_KEY`) work as fallback.
 
 ### Configure in Claude Code
 
-Add to your project's `.claude/settings.json`:
+The project's `.claude/settings.json` already has the MCP server configured. Just install the package and set up credentials.
 
-```json
-{
-  "mcpServers": {
-    "odoo": {
-      "command": "python",
-      "args": ["-m", "puya_odoo_mcp"],
-      "env": {
-        "ODOO_URL": "https://costasurmat.odoo.com",
-        "ODOO_DB": ""
-      }
-    }
-  }
-}
-```
+## Security
 
-Set `ODOO_API_KEY` and `ODOO_DB` as system environment variables.
+Two layers of protection:
+
+1. **Hidden credentials**: API key lives in `~/.config/puya-odoo-mcp/credentials` (not in env vars), so Claude Code cannot access it directly
+2. **Odoo native permissions**: Each user's Odoo account has restricted groups/permissions as a second layer, so even if the MCP is bypassed, the API key can only do what Odoo allows
 
 ## Roles
 
@@ -55,7 +55,7 @@ Set `ODOO_API_KEY` and `ODOO_DB` as system environment variables.
 | administrativo | All allowed models | Yes | Whitelisted | No |
 | developer | All models | Yes | All | Yes |
 
-Roles are configured in `permissions.yaml`. Assign roles in Odoo at Settings > Users > MCP Role.
+Roles are configured in `permissions.yaml`. Assign roles in Odoo at Settings > Users > MCP Role (debug mode).
 
 ## Tools
 
