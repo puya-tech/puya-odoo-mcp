@@ -15,7 +15,7 @@ logger = logging.getLogger("puya_odoo_mcp")
 
 def create_server() -> FastMCP:
     config = Config()
-    client = OdooClient(config.odoo_url, config.odoo_db, config.odoo_api_key)
+    client = OdooClient(config.odoo_url, config.odoo_db, config.odoo_login, config.odoo_api_key)
     uid = client.authenticate()
     role = client.get_user_role()
 

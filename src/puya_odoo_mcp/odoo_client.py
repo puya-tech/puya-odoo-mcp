@@ -6,9 +6,10 @@ class OdooError(Exception):
 
 
 class OdooClient:
-    def __init__(self, url: str, db: str, api_key: str):
+    def __init__(self, url: str, db: str, login: str, api_key: str):
         self.url = url
         self.db = db
+        self.login = login
         self.api_key = api_key
         self.uid = None
         self._common = xmlrpc.client.ServerProxy(
@@ -20,7 +21,7 @@ class OdooClient:
 
     def authenticate(self) -> int:
         try:
-            self.uid = self._common.authenticate(self.db, "", self.api_key, {})
+            self.uid = self._common.authenticate(self.db, self.login, self.api_key, {})
         except xmlrpc.client.Fault as e:
             raise OdooError(f"Authentication failed: {e.faultString}") from e
         except xmlrpc.client.ProtocolError as e:
