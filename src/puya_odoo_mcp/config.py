@@ -34,6 +34,14 @@ class Config:
         self.odoo_login = creds.get("ODOO_LOGIN") or os.environ.get("ODOO_LOGIN", "")
         self.odoo_api_key = creds.get("ODOO_API_KEY") or os.environ.get("ODOO_API_KEY", "")
 
+        # Supabase (optional — for centralized audit logging)
+        self.supabase_url = (creds.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL", "")).rstrip("/")
+        self.supabase_key = creds.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY", "")
+
+        # Telegram (optional — for approval notifications)
+        self.telegram_bot_token = creds.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN", "")
+        self.telegram_chat_id = creds.get("TELEGRAM_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID", "")
+
         missing = []
         if not self.odoo_url:
             missing.append("ODOO_URL")

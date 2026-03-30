@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 
 import yaml
@@ -15,6 +16,26 @@ class Permission:
         self.domain_filter = domain_filter
 
 
+# Models that should NEVER be accessible via MCP for non-developer roles.
+# These control Odoo's security infrastructure itself.
+INFRA_BLOCKED_MODELS = frozenset([
+    "res.users",
+    "res.groups",
+    "ir.config_parameter",
+    "ir.rule",
+    "ir.model.access",
+    "ir.module.module",
+    "ir.cron",
+    "base.automation",
+])
+
+# Fields that must never be writable via MCP, even for developer.
+# These are the fields that control MCP access itself.
+PROTECTED_FIELDS = frozenset([
+    "x_mcp_role",
+])
+
+
 class RBACEngine:
     def __init__(self, permissions_path: str | Path | None = None):
         if permissions_path is None:
@@ -22,6 +43,15 @@ class RBACEngine:
         with open(permissions_path) as f:
             data = yaml.safe_load(f)
         self._roles = data.get("roles", {})
+        self._settings = data.get("settings", {})
+
+    @property
+    def massive_threshold(self) -> int:
+        return self._settings.get("massive_threshold", 10)
+
+    @property
+    def pending_expiry_minutes(self) -> int:
+        return self._settings.get("pending_expiry_minutes", 10)
 
     def _get_role_config(self, role: str) -> dict:
         config = self._roles.get(role)
@@ -32,6 +62,11 @@ class RBACEngine:
     def check_model_access(self, role: str, model: str, operation: str) -> Permission:
         config = self._get_role_config(role)
 
+        # Infra models blocked for all non-developer roles
+        if role != "developer" and model in INFRA_BLOCKED_MODELS:
+            raise PermissionDenied(f"Model '{model}' is blocked for role '{role}'")
+
+        # Per-role blocked models
         blocked = config.get("blocked_models", [])
         if model in blocked:
             raise PermissionDenied(f"Model '{model}' is blocked for role '{role}'")
@@ -64,10 +99,14 @@ class RBACEngine:
             return fields
         return [f for f in fields if f not in permission.fields_denied]
 
+    def strip_protected_fields(self, values: dict) -> dict:
+        """Remove fields that must never be written via MCP."""
+        return {k: v for k, v in values.items() if k not in PROTECTED_FIELDS}
+
     def inject_domain(self, permission: Permission, domain: list, uid: int) -> list:
         if not permission.domain_filter:
             return domain
-        extra = eval(permission.domain_filter.replace("{uid}", str(uid)))
+        extra = ast.literal_eval(permission.domain_filter.replace("{uid}", str(uid)))
         return (domain or []) + extra
 
     def check_method_access(self, role: str, model: str, method: str) -> bool:
@@ -75,6 +114,10 @@ class RBACEngine:
 
         blocked = config.get("blocked_models", [])
         if model in blocked:
+            return False
+
+        # Infra models blocked for non-developer
+        if role != "developer" and model in INFRA_BLOCKED_MODELS:
             return False
 
         allowed = config.get("methods_allowed", [])
