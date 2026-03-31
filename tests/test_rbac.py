@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
 
-from puya_odoo_mcp.rbac import RBACEngine, PermissionDenied
+from puya_odoo_mcp.rbac import RBACEngine, PermissionDenied, INFRA_BLOCKED_MODELS, PROTECTED_FIELDS
 
 PERMISSIONS_PATH = Path(__file__).parent.parent / "permissions.yaml"
 
@@ -73,6 +73,42 @@ class TestDeveloper:
     def test_can_unlink(self, rbac):
         perm = rbac.check_model_access("developer", "res.partner", "unlink")
         assert "unlink" in perm.operations
+
+
+class TestInfraBlockedModels:
+    """Infra models must be blocked for all non-developer roles."""
+
+    @pytest.mark.parametrize("model", sorted(INFRA_BLOCKED_MODELS))
+    def test_vendedor_blocked(self, rbac, model):
+        with pytest.raises(PermissionDenied):
+            rbac.check_model_access("vendedor", model, "search_read")
+
+    @pytest.mark.parametrize("model", sorted(INFRA_BLOCKED_MODELS))
+    def test_administrativo_blocked(self, rbac, model):
+        with pytest.raises(PermissionDenied):
+            rbac.check_model_access("administrativo", model, "search_read")
+
+    @pytest.mark.parametrize("model", sorted(INFRA_BLOCKED_MODELS))
+    def test_administrativo_method_blocked(self, rbac, model):
+        assert not rbac.check_method_access("administrativo", model, "any_method")
+
+    def test_developer_can_access_infra(self, rbac):
+        """Developer is the exception — can access infra models."""
+        perm = rbac.check_model_access("developer", "res.users", "search_read")
+        assert "search_read" in perm.operations
+
+
+class TestProtectedFields:
+    def test_strip_protected_fields(self, rbac):
+        values = {"name": "Test", "x_mcp_role": "developer", "email": "a@b.com"}
+        cleaned = rbac.strip_protected_fields(values)
+        assert "x_mcp_role" not in cleaned
+        assert cleaned == {"name": "Test", "email": "a@b.com"}
+
+    def test_strip_empty_after_protection(self, rbac):
+        values = {"x_mcp_role": "developer"}
+        cleaned = rbac.strip_protected_fields(values)
+        assert cleaned == {}
 
 
 class TestFilterFields:

@@ -1,3 +1,9 @@
+settings:
+  # Actions affecting more than this many records require approval
+  massive_threshold: 10
+  # Pending actions expire after this many minutes
+  pending_expiry_minutes: 10
+
 roles:
   vendedor:
     models:
