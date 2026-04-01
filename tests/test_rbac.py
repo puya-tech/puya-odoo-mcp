@@ -20,15 +20,15 @@ class TestVendedor:
         with pytest.raises(PermissionDenied):
             rbac.check_model_access("vendedor", "res.partner", "write")
 
-    def test_fields_denied(self, rbac):
-        perm = rbac.check_model_access("vendedor", "res.partner", "search_read")
-        assert "credit_limit" in perm.fields_denied
+    def test_can_search_any_model(self, rbac):
+        """Vendedor can read any non-blocked model (open exploration)."""
+        perm = rbac.check_model_access("vendedor", "hr.employee", "search_read")
+        assert "search_read" in perm.operations
 
-    def test_domain_filter(self, rbac):
-        perm = rbac.check_model_access("vendedor", "res.partner", "search_read")
-        assert perm.domain_filter is not None
-        domain = rbac.inject_domain(perm, [], 42)
-        assert ("user_id", "=", 42) in domain
+    def test_no_domain_filter_on_wildcard(self, rbac):
+        """Open read — no domain filters restricting to own records."""
+        perm = rbac.check_model_access("vendedor", "sale.order", "search_read")
+        assert perm.domain_filter is None
 
     def test_blocked_model(self, rbac):
         with pytest.raises(PermissionDenied):
@@ -37,15 +37,25 @@ class TestVendedor:
     def test_no_method_access(self, rbac):
         assert not rbac.check_method_access("vendedor", "sale.order", "action_confirm")
 
-    def test_cannot_access_unknown_model(self, rbac):
+    def test_cannot_write_any_model(self, rbac):
         with pytest.raises(PermissionDenied):
-            rbac.check_model_access("vendedor", "hr.employee", "search_read")
+            rbac.check_model_access("vendedor", "sale.order", "write")
 
 
 class TestAdministrativo:
     def test_can_write_partners(self, rbac):
         perm = rbac.check_model_access("administrativo", "res.partner", "write")
         assert "write" in perm.operations
+
+    def test_can_search_any_model(self, rbac):
+        """Administrativo can read any non-blocked model."""
+        perm = rbac.check_model_access("administrativo", "hr.employee", "search_read")
+        assert "search_read" in perm.operations
+
+    def test_cannot_write_unknown_model(self, rbac):
+        """Can read any model but cannot write to models not explicitly listed."""
+        with pytest.raises(PermissionDenied):
+            rbac.check_model_access("administrativo", "hr.employee", "write")
 
     def test_can_confirm_sale(self, rbac):
         assert rbac.check_method_access("administrativo", "sale.order", "action_confirm")
@@ -56,10 +66,6 @@ class TestAdministrativo:
     def test_blocked_model(self, rbac):
         with pytest.raises(PermissionDenied):
             rbac.check_model_access("administrativo", "res.users", "search_read")
-
-    def test_standard_price_denied(self, rbac):
-        perm = rbac.check_model_access("administrativo", "product.product", "search_read")
-        assert "standard_price" in perm.fields_denied
 
 
 class TestDeveloper:
@@ -76,7 +82,7 @@ class TestDeveloper:
 
 
 class TestInfraBlockedModels:
-    """Infra models must be blocked for all non-developer roles."""
+    """Infra/secret models must be blocked for all non-developer roles."""
 
     @pytest.mark.parametrize("model", sorted(INFRA_BLOCKED_MODELS))
     def test_vendedor_blocked(self, rbac, model):
@@ -97,6 +103,18 @@ class TestInfraBlockedModels:
         perm = rbac.check_model_access("developer", "res.users", "search_read")
         assert "search_read" in perm.operations
 
+    def test_apikeys_blocked(self, rbac):
+        """API key models must be blocked."""
+        for model in ["res.users.apikeys", "res.users.apikeys.show"]:
+            with pytest.raises(PermissionDenied):
+                rbac.check_model_access("vendedor", model, "search_read")
+
+    def test_password_models_blocked(self, rbac):
+        """Password change models must be blocked."""
+        for model in ["change.password.wizard", "change.password.user", "change.password.own"]:
+            with pytest.raises(PermissionDenied):
+                rbac.check_model_access("administrativo", model, "search_read")
+
 
 class TestProtectedFields:
     def test_strip_protected_fields(self, rbac):
@@ -112,16 +130,15 @@ class TestProtectedFields:
 
 
 class TestFilterFields:
-    def test_removes_denied(self, rbac):
+    def test_no_fields_denied_on_wildcard(self, rbac):
+        """Wildcard read has no field restrictions."""
         perm = rbac.check_model_access("vendedor", "product.product", "search_read")
-        filtered = rbac.filter_fields(perm, ["name", "standard_price", "list_price"])
-        assert "standard_price" not in filtered
-        assert "name" in filtered
-        assert "list_price" in filtered
+        assert perm.fields_denied == []
 
-    def test_no_denied_fields(self, rbac):
-        perm = rbac.check_model_access("administrativo", "res.partner", "search_read")
-        fields = ["name", "email"]
+    def test_filter_fields_passthrough(self, rbac):
+        """With no denied fields, all fields pass through."""
+        perm = rbac.check_model_access("vendedor", "res.partner", "search_read")
+        fields = ["name", "email", "credit_limit"]
         filtered = rbac.filter_fields(perm, fields)
         assert filtered == fields
 

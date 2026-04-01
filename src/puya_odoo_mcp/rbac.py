@@ -17,8 +17,9 @@ class Permission:
 
 
 # Models that should NEVER be accessible via MCP for non-developer roles.
-# These control Odoo's security infrastructure itself.
+# These control Odoo's security infrastructure or expose secrets.
 INFRA_BLOCKED_MODELS = frozenset([
+    # Security infrastructure
     "res.users",
     "res.groups",
     "ir.config_parameter",
@@ -27,6 +28,15 @@ INFRA_BLOCKED_MODELS = frozenset([
     "ir.module.module",
     "ir.cron",
     "base.automation",
+    # Secrets and credentials
+    "res.users.apikeys",
+    "res.users.apikeys.show",
+    "res.users.apikeys.description",
+    "change.password.wizard",
+    "change.password.user",
+    "change.password.own",
+    # Payment tokens
+    "payment.token",
 ])
 
 # Fields that must never be writable via MCP, even for developer.
