@@ -16,19 +16,13 @@ class Permission:
         self.domain_filter = domain_filter
 
 
-# Models that should NEVER be accessible via MCP for non-developer roles.
-# These control Odoo's security infrastructure or expose secrets.
+# Models blocked for non-developer roles because reading them exposes secrets.
+# Other system models (ir.cron, ir.rule, res.groups, etc.) are readable
+# because seeing config is harmless — writing is already blocked by RBAC.
 INFRA_BLOCKED_MODELS = frozenset([
-    # Security infrastructure
-    "res.users",
-    "res.groups",
+    # Contains system secrets (email keys, integration tokens, etc.)
     "ir.config_parameter",
-    "ir.rule",
-    "ir.model.access",
-    "ir.module.module",
-    "ir.cron",
-    "base.automation",
-    # Secrets and credentials
+    # User credentials and authentication
     "res.users.apikeys",
     "res.users.apikeys.show",
     "res.users.apikeys.description",

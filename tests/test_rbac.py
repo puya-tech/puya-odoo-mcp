@@ -63,9 +63,14 @@ class TestAdministrativo:
     def test_cannot_confirm_arbitrary(self, rbac):
         assert not rbac.check_method_access("administrativo", "sale.order", "unlink")
 
-    def test_blocked_model(self, rbac):
+    def test_can_read_users(self, rbac):
+        """res.users is readable (no secrets exposed, useful for seeing who owns what)."""
+        perm = rbac.check_model_access("administrativo", "res.users", "search_read")
+        assert "search_read" in perm.operations
+
+    def test_cannot_write_users(self, rbac):
         with pytest.raises(PermissionDenied):
-            rbac.check_model_access("administrativo", "res.users", "search_read")
+            rbac.check_model_access("administrativo", "res.users", "write")
 
 
 class TestDeveloper:
