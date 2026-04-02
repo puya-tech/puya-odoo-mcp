@@ -26,22 +26,20 @@ Indicale al usuario que vaya a:
 
 ### Paso 3: Crear archivo de credenciales
 
+Los valores publicos (URL de Odoo, DB, Supabase URL, Telegram chat ID) ya vienen en `config/shared.env` dentro del repo. El usuario solo necesita agregar sus secretos:
+
 ```bash
 mkdir -p ~/.config/puya-odoo-mcp
 cat > ~/.config/puya-odoo-mcp/credentials << 'EOF'
-ODOO_URL=https://cmcorpcl-puyacentro.odoo.com
-ODOO_DB=cmcorpcl-costasurmat-main-7982838
 ODOO_LOGIN=<EMAIL_DEL_USUARIO>
-ODOO_API_KEY=<API_KEY_GENERADA>
-SUPABASE_URL=https://lozdcwaeynloidrkeqfn.supabase.co
+ODOO_API_KEY=<API_KEY_GENERADA_EN_PASO_2>
 SUPABASE_SERVICE_KEY=<PEDIR_A_ADMIN>
 TELEGRAM_BOT_TOKEN=<PEDIR_A_ADMIN>
-TELEGRAM_CHAT_ID=-5217402672
 EOF
 chmod 600 ~/.config/puya-odoo-mcp/credentials
 ```
 
-**El usuario debe reemplazar** `<EMAIL_DEL_USUARIO>` y `<API_KEY_GENERADA>` con sus datos. Las credenciales de Supabase y Telegram son compartidas — pedirlas al admin del proyecto.
+**El usuario debe reemplazar** los valores entre `<>`. Las credenciales de Supabase y Telegram son compartidas — pedirlas al admin del proyecto.
 
 ### Paso 4: Configurar en Claude Code
 

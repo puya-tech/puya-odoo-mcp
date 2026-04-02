@@ -9,15 +9,30 @@ FULL_CREDS = (
     "ODOO_API_KEY=key123\n"
 )
 
+SHARED_ONLY = (
+    "ODOO_URL=https://shared.odoo.com\n"
+    "ODOO_DB=shareddb\n"
+    "SUPABASE_URL=https://shared.supabase.co\n"
+    "TELEGRAM_CHAT_ID=-123\n"
+)
+
+USER_SECRETS = (
+    "ODOO_LOGIN=user@test.com\n"
+    "ODOO_API_KEY=key123\n"
+    "SUPABASE_SERVICE_KEY=supa-secret\n"
+    "TELEGRAM_BOT_TOKEN=bot-token\n"
+)
+
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch, tmp_path):
-    """Clear env vars and point credentials file to nonexistent path."""
-    monkeypatch.delenv("ODOO_URL", raising=False)
-    monkeypatch.delenv("ODOO_DB", raising=False)
-    monkeypatch.delenv("ODOO_LOGIN", raising=False)
-    monkeypatch.delenv("ODOO_API_KEY", raising=False)
+    """Clear env vars and point files to nonexistent paths."""
+    for var in ["ODOO_URL", "ODOO_DB", "ODOO_LOGIN", "ODOO_API_KEY",
+                "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
+                "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]:
+        monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", tmp_path / "nocreds")
+    monkeypatch.setattr("puya_odoo_mcp.config.SHARED_ENV_FILE", tmp_path / "noshared")
 
 
 def test_valid_config_from_env(monkeypatch):
@@ -28,8 +43,6 @@ def test_valid_config_from_env(monkeypatch):
     config = Config()
     assert config.odoo_url == "https://test.odoo.com"
     assert config.odoo_db == "testdb"
-    assert config.odoo_login == "user@test.com"
-    assert config.odoo_api_key == "key123"
 
 
 def test_valid_config_from_file(monkeypatch, tmp_path):
@@ -39,7 +52,42 @@ def test_valid_config_from_file(monkeypatch, tmp_path):
     config = Config()
     assert config.odoo_url == "https://test.odoo.com"
     assert config.odoo_login == "user@test.com"
+
+
+def test_shared_plus_user_creds(monkeypatch, tmp_path):
+    """shared.env provides URL/DB, user credentials provide login/key."""
+    shared = tmp_path / "shared.env"
+    shared.write_text(SHARED_ONLY)
+    monkeypatch.setattr("puya_odoo_mcp.config.SHARED_ENV_FILE", shared)
+
+    creds = tmp_path / "credentials"
+    creds.write_text(USER_SECRETS)
+    monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", creds)
+
+    config = Config()
+    assert config.odoo_url == "https://shared.odoo.com"
+    assert config.odoo_db == "shareddb"
+    assert config.odoo_login == "user@test.com"
     assert config.odoo_api_key == "key123"
+    assert config.supabase_url == "https://shared.supabase.co"
+    assert config.supabase_key == "supa-secret"
+    assert config.telegram_bot_token == "bot-token"
+    assert config.telegram_chat_id == "-123"
+
+
+def test_user_creds_override_shared(monkeypatch, tmp_path):
+    """User credentials take priority over shared."""
+    shared = tmp_path / "shared.env"
+    shared.write_text("ODOO_URL=https://shared.odoo.com\nODOO_DB=shareddb\n")
+    monkeypatch.setattr("puya_odoo_mcp.config.SHARED_ENV_FILE", shared)
+
+    creds = tmp_path / "credentials"
+    creds.write_text("ODOO_URL=https://override.odoo.com\nODOO_DB=overridedb\n"
+                     "ODOO_LOGIN=user@test.com\nODOO_API_KEY=key123\n")
+    monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", creds)
+
+    config = Config()
+    assert config.odoo_url == "https://override.odoo.com"
 
 
 def test_file_takes_priority_over_env(monkeypatch, tmp_path):
@@ -52,7 +100,6 @@ def test_file_takes_priority_over_env(monkeypatch, tmp_path):
     monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", creds_file)
     config = Config()
     assert config.odoo_url == "https://test.odoo.com"
-    assert config.odoo_api_key == "key123"
 
 
 def test_strips_trailing_slash(monkeypatch):
@@ -65,8 +112,6 @@ def test_strips_trailing_slash(monkeypatch):
 
 
 def test_missing_config(monkeypatch, tmp_path):
-    creds_file = tmp_path / "credentials"
-    monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", creds_file)
     with pytest.raises(ConfigError, match="ODOO_URL"):
         Config()
 

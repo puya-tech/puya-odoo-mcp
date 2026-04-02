@@ -3,18 +3,19 @@ from pathlib import Path
 
 CREDENTIALS_DIR = Path.home() / ".config" / "puya-odoo-mcp"
 CREDENTIALS_FILE = CREDENTIALS_DIR / "credentials"
+SHARED_ENV_FILE = Path(__file__).parent.parent.parent / "config" / "shared.env"
 
 
 class ConfigError(Exception):
     pass
 
 
-def _read_credentials_file() -> dict:
-    """Read key=value pairs from ~/.config/puya-odoo-mcp/credentials."""
-    if not CREDENTIALS_FILE.exists():
+def _read_env_file(path: Path) -> dict:
+    """Read key=value pairs from a file."""
+    if not path.exists():
         return {}
     values = {}
-    for line in CREDENTIALS_FILE.read_text().splitlines():
+    for line in path.read_text().splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -26,22 +27,32 @@ def _read_credentials_file() -> dict:
 
 class Config:
     def __init__(self):
-        creds = _read_credentials_file()
+        # Layer 1: Shared config from repo (public values)
+        shared = _read_env_file(SHARED_ENV_FILE)
 
-        # Credentials file takes priority, env vars as fallback
-        self.odoo_url = (creds.get("ODOO_URL") or os.environ.get("ODOO_URL", "")).rstrip("/")
-        self.odoo_db = creds.get("ODOO_DB") or os.environ.get("ODOO_DB", "")
-        self.odoo_login = creds.get("ODOO_LOGIN") or os.environ.get("ODOO_LOGIN", "")
-        self.odoo_api_key = creds.get("ODOO_API_KEY") or os.environ.get("ODOO_API_KEY", "")
+        # Layer 2: User credentials file (secrets, overrides shared)
+        user_creds = _read_env_file(CREDENTIALS_FILE)
 
-        # Supabase (optional — for centralized audit logging)
-        self.supabase_url = (creds.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL", "")).rstrip("/")
-        self.supabase_key = creds.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_KEY", "")
+        # Layer 3: Environment variables (fallback)
+        # Priority: user_creds > shared > env vars
+        def _get(key: str) -> str:
+            return user_creds.get(key) or shared.get(key) or os.environ.get(key, "")
 
-        # Telegram (optional — for approval notifications)
-        self.telegram_bot_token = creds.get("TELEGRAM_BOT_TOKEN") or os.environ.get("TELEGRAM_BOT_TOKEN", "")
-        self.telegram_chat_id = creds.get("TELEGRAM_CHAT_ID") or os.environ.get("TELEGRAM_CHAT_ID", "")
+        # Odoo (URL/DB from shared, login/key from user)
+        self.odoo_url = _get("ODOO_URL").rstrip("/")
+        self.odoo_db = _get("ODOO_DB")
+        self.odoo_login = _get("ODOO_LOGIN")
+        self.odoo_api_key = _get("ODOO_API_KEY")
 
+        # Supabase (URL from shared, service key from user)
+        self.supabase_url = _get("SUPABASE_URL").rstrip("/")
+        self.supabase_key = _get("SUPABASE_SERVICE_KEY")
+
+        # Telegram (chat_id from shared, bot token from user)
+        self.telegram_bot_token = _get("TELEGRAM_BOT_TOKEN")
+        self.telegram_chat_id = _get("TELEGRAM_CHAT_ID")
+
+        # Validate required Odoo config
         missing = []
         if not self.odoo_url:
             missing.append("ODOO_URL")
@@ -54,5 +65,6 @@ class Config:
 
         if missing:
             raise ConfigError(
-                f"Missing config. Set in {CREDENTIALS_FILE} or as env vars: {', '.join(missing)}"
+                f"Missing config: {', '.join(missing)}. "
+                f"Add to {CREDENTIALS_FILE} or as env vars."
             )

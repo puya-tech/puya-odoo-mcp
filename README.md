@@ -39,28 +39,20 @@ pip install -e .
 
 ### 3. Configurar credenciales
 
-Cada usuario crea su propio archivo de credenciales:
+Los valores publicos (URL, DB, etc.) ya vienen en `config/shared.env` dentro del repo. Cada usuario solo necesita agregar sus secretos:
 
 ```bash
 mkdir -p ~/.config/puya-odoo-mcp
 cat > ~/.config/puya-odoo-mcp/credentials << 'EOF'
-ODOO_URL=https://cmcorpcl-puyacentro.odoo.com
-ODOO_DB=cmcorpcl-costasurmat-main-7982838
 ODOO_LOGIN=tu-email@empresa.cl
 ODOO_API_KEY=tu-api-key-de-odoo
-
-# Audit trail centralizado (pedir a admin)
-SUPABASE_URL=https://lozdcwaeynloidrkeqfn.supabase.co
-SUPABASE_SERVICE_KEY=la-service-key-de-supabase
-
-# Notificaciones de aprobacion (pedir a admin)
-TELEGRAM_BOT_TOKEN=token-del-bot
-TELEGRAM_CHAT_ID=id-del-grupo
+SUPABASE_SERVICE_KEY=pedir-a-admin
+TELEGRAM_BOT_TOKEN=pedir-a-admin
 EOF
 chmod 600 ~/.config/puya-odoo-mcp/credentials
 ```
 
-**Importante:** El archivo tiene permisos 600 (solo el usuario puede leerlo). Claude Code nunca ve el API key ni las credenciales.
+**Importante:** El archivo tiene permisos 600 (solo el usuario puede leerlo). Claude Code nunca ve el API key ni las credenciales. Las credenciales de Supabase y Telegram son compartidas — pedirlas al admin del proyecto.
 
 ### 4. Configurar en Claude Code
 
