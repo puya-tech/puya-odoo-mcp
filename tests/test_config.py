@@ -1,6 +1,6 @@
 import pytest
 
-from puya_odoo_mcp.config import Config, ConfigError, CREDENTIALS_FILE
+from puya_odoo_mcp.config import Config, ConfigError
 
 FULL_CREDS = (
     "ODOO_URL=https://test.odoo.com\n"
@@ -26,13 +26,13 @@ USER_SECRETS = (
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch, tmp_path):
-    """Clear env vars and point files to nonexistent paths."""
-    for var in ["ODOO_URL", "ODOO_DB", "ODOO_LOGIN", "ODOO_API_KEY",
+    """Clear env vars and point files to temp paths."""
+    for var in ["ODOO_URL", "ODOO_DB", "ODOO_LOGIN", "ODOO_API_KEY", "ODOO_ENV",
                 "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
                 "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]:
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", tmp_path / "nocreds")
-    monkeypatch.setattr("puya_odoo_mcp.config.SHARED_ENV_FILE", tmp_path / "noshared")
+    monkeypatch.setattr("puya_odoo_mcp.config.CONFIG_DIR", tmp_path / "noconfig")
 
 
 def test_valid_config_from_env(monkeypatch):
@@ -56,9 +56,10 @@ def test_valid_config_from_file(monkeypatch, tmp_path):
 
 def test_shared_plus_user_creds(monkeypatch, tmp_path):
     """shared.env provides URL/DB, user credentials provide login/key."""
-    shared = tmp_path / "shared.env"
-    shared.write_text(SHARED_ONLY)
-    monkeypatch.setattr("puya_odoo_mcp.config.SHARED_ENV_FILE", shared)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "shared.env").write_text(SHARED_ONLY)
+    monkeypatch.setattr("puya_odoo_mcp.config.CONFIG_DIR", config_dir)
 
     creds = tmp_path / "credentials"
     creds.write_text(USER_SECRETS)
@@ -73,13 +74,34 @@ def test_shared_plus_user_creds(monkeypatch, tmp_path):
     assert config.supabase_key == "supa-secret"
     assert config.telegram_bot_token == "bot-token"
     assert config.telegram_chat_id == "-123"
+    assert config.environment == "production"
+
+
+def test_staging_env(monkeypatch, tmp_path):
+    """ODOO_ENV=staging reads shared.staging.env."""
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "shared.staging.env").write_text(
+        "ODOO_URL=https://staging.odoo.com\nODOO_DB=stagingdb\n"
+    )
+    monkeypatch.setattr("puya_odoo_mcp.config.CONFIG_DIR", config_dir)
+
+    creds = tmp_path / "credentials"
+    creds.write_text("ODOO_ENV=staging\nODOO_LOGIN=user@test.com\nODOO_API_KEY=key123\n")
+    monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", creds)
+
+    config = Config()
+    assert config.environment == "staging"
+    assert config.odoo_url == "https://staging.odoo.com"
+    assert config.odoo_db == "stagingdb"
 
 
 def test_user_creds_override_shared(monkeypatch, tmp_path):
     """User credentials take priority over shared."""
-    shared = tmp_path / "shared.env"
-    shared.write_text("ODOO_URL=https://shared.odoo.com\nODOO_DB=shareddb\n")
-    monkeypatch.setattr("puya_odoo_mcp.config.SHARED_ENV_FILE", shared)
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "shared.env").write_text("ODOO_URL=https://shared.odoo.com\nODOO_DB=shareddb\n")
+    monkeypatch.setattr("puya_odoo_mcp.config.CONFIG_DIR", config_dir)
 
     creds = tmp_path / "credentials"
     creds.write_text("ODOO_URL=https://override.odoo.com\nODOO_DB=overridedb\n"
@@ -111,7 +133,7 @@ def test_strips_trailing_slash(monkeypatch):
     assert config.odoo_url == "https://test.odoo.com"
 
 
-def test_missing_config(monkeypatch, tmp_path):
+def test_missing_config():
     with pytest.raises(ConfigError, match="ODOO_URL"):
         Config()
 
@@ -122,3 +144,17 @@ def test_comments_and_blanks_in_file(monkeypatch, tmp_path):
     monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", creds_file)
     config = Config()
     assert config.odoo_url == "https://test.odoo.com"
+
+
+def test_invalid_env(monkeypatch, tmp_path):
+    """Unknown environment raises error."""
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    monkeypatch.setattr("puya_odoo_mcp.config.CONFIG_DIR", config_dir)
+
+    creds = tmp_path / "credentials"
+    creds.write_text("ODOO_ENV=doesnotexist\nODOO_LOGIN=x\nODOO_API_KEY=y\n")
+    monkeypatch.setattr("puya_odoo_mcp.config.CREDENTIALS_FILE", creds)
+
+    with pytest.raises(ConfigError, match="doesnotexist"):
+        Config()

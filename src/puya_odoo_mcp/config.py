@@ -3,7 +3,7 @@ from pathlib import Path
 
 CREDENTIALS_DIR = Path.home() / ".config" / "puya-odoo-mcp"
 CREDENTIALS_FILE = CREDENTIALS_DIR / "credentials"
-SHARED_ENV_FILE = Path(__file__).parent.parent.parent / "config" / "shared.env"
+CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
 
 
 class ConfigError(Exception):
@@ -27,11 +27,23 @@ def _read_env_file(path: Path) -> dict:
 
 class Config:
     def __init__(self):
-        # Layer 1: Shared config from repo (public values)
-        shared = _read_env_file(SHARED_ENV_FILE)
-
-        # Layer 2: User credentials file (secrets, overrides shared)
+        # Layer 1: User credentials file (read early to get ODOO_ENV)
         user_creds = _read_env_file(CREDENTIALS_FILE)
+
+        # Determine environment: credentials > env var > default (production)
+        env = user_creds.get("ODOO_ENV") or os.environ.get("ODOO_ENV", "production")
+        if env == "production":
+            shared_file = CONFIG_DIR / "shared.env"
+        else:
+            shared_file = CONFIG_DIR / f"shared.{env}.env"
+            if not shared_file.exists():
+                raise ConfigError(
+                    f"Environment '{env}' config not found: {shared_file}"
+                )
+
+        # Layer 2: Shared config from repo (public values)
+        shared = _read_env_file(shared_file)
+        self.environment = env
 
         # Layer 3: Environment variables (fallback)
         # Priority: user_creds > shared > env vars
@@ -68,3 +80,8 @@ class Config:
                 f"Missing config: {', '.join(missing)}. "
                 f"Add to {CREDENTIALS_FILE} or as env vars."
             )
+
+    @staticmethod
+    def list_environments() -> list[Path]:
+        """List available shared environment files."""
+        return sorted(CONFIG_DIR.glob("shared*.env"))

@@ -102,16 +102,94 @@ def create_server() -> FastMCP:
     massive_threshold = rbac.massive_threshold
     expiry_minutes = rbac.pending_expiry_minutes
 
+    env_label = config.environment.upper()
+
     mcp = FastMCP(
         "Odoo",
         instructions=(
-            f"Odoo 16 MCP server. User: {username}, Role: {role}. "
+            f"Odoo 16 MCP server. Environment: {env_label}. User: {username}, Role: {role}. "
             "Use odoo_search to query data, odoo_fields to inspect models. "
             "IMPORTANT: All write operations return a preview first. "
             "You MUST show the preview to the user and wait for their confirmation "
             "before calling odoo_confirm. Never confirm without user approval."
         ),
     )
+
+    # ── Status & environment tools (all roles) ──────────────────────────
+
+    @mcp.tool()
+    def odoo_status() -> str:
+        """Show current MCP connection status: environment, user, role, URL."""
+        available_envs = [
+            f.stem.replace("shared.", "").replace(".env", "") or "production"
+            for f in sorted(Config.list_environments())
+        ]
+        return _serialize({
+            "environment": config.environment,
+            "odoo_url": config.odoo_url,
+            "odoo_db": config.odoo_db,
+            "user": username,
+            "role": role,
+            "uid": uid,
+            "available_environments": available_envs,
+            "supabase_connected": bool(config.supabase_url and config.supabase_key),
+            "telegram_connected": bool(config.telegram_bot_token and config.telegram_chat_id),
+        })
+
+    @mcp.tool()
+    def odoo_switch_env(environment: str) -> str:
+        """Switch the MCP to a different Odoo environment (e.g. 'staging', 'production').
+        After switching, the MCP must be restarted with /mcp for changes to take effect.
+
+        Args:
+            environment: Target environment name ('production' or 'staging')
+        """
+        from .config import CONFIG_DIR, CREDENTIALS_FILE, _read_env_file
+
+        # Validate environment exists
+        if environment == "production":
+            target = CONFIG_DIR / "shared.env"
+        else:
+            target = CONFIG_DIR / f"shared.{environment}.env"
+
+        if not target.exists():
+            available = [
+                f.stem.replace("shared.", "").replace(".env", "") or "production"
+                for f in sorted(CONFIG_DIR.glob("shared*.env"))
+            ]
+            return _serialize({
+                "error": f"Environment '{environment}' not found",
+                "available": available,
+            })
+
+        # Read current credentials, update ODOO_ENV, remove URL/DB overrides
+        creds = _read_env_file(CREDENTIALS_FILE)
+
+        if environment == "production":
+            creds.pop("ODOO_ENV", None)
+        else:
+            creds["ODOO_ENV"] = environment
+
+        # Remove URL/DB overrides so shared.env takes effect
+        creds.pop("ODOO_URL", None)
+        creds.pop("ODOO_DB", None)
+
+        # Write back
+        lines = []
+        for key, value in creds.items():
+            lines.append(f"{key}={value}")
+
+        CREDENTIALS_FILE.write_text("\n".join(lines) + "\n")
+
+        # Read target env to show what it will connect to
+        target_config = _read_env_file(target)
+
+        return _serialize({
+            "switched_to": environment,
+            "odoo_url": target_config.get("ODOO_URL", "from credentials"),
+            "odoo_db": target_config.get("ODOO_DB", "from credentials"),
+            "action_required": "Reinicia el MCP con /mcp para que los cambios tomen efecto.",
+        })
 
     # ── Read-only tools (all roles) ─────────────────────────────────────
 
