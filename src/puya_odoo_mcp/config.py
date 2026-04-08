@@ -43,7 +43,6 @@ class Config:
 
         # Layer 2: Shared config from repo (public values)
         shared = _read_env_file(shared_file)
-        self.environment = env
 
         # Layer 3: Environment variables (fallback)
         # Priority: user_creds > shared > env vars
@@ -55,6 +54,26 @@ class Config:
         self.odoo_db = _get("ODOO_DB")
         self.odoo_login = _get("ODOO_LOGIN")
         self.odoo_api_key = _get("ODOO_API_KEY")
+
+        # Determine effective environment:
+        # If user set ODOO_ENV explicitly, use that.
+        # Otherwise, detect by comparing URL to production shared.env.
+        if env != "production":
+            self.environment = env
+        else:
+            prod_url = shared.get("ODOO_URL", "").rstrip("/")
+            if prod_url and self.odoo_url and self.odoo_url != prod_url:
+                # URL was overridden to something other than production
+                self.environment = "custom"
+                # Try to match against known staging configs
+                for env_file in sorted(CONFIG_DIR.glob("shared.*.env")):
+                    env_config = _read_env_file(env_file)
+                    if env_config.get("ODOO_URL", "").rstrip("/") == self.odoo_url:
+                        # Extract env name: shared.staging.env → staging
+                        self.environment = env_file.stem.replace("shared.", "")
+                        break
+            else:
+                self.environment = "production"
 
         # Supabase (URL from shared, service key from user)
         self.supabase_url = _get("SUPABASE_URL").rstrip("/")
