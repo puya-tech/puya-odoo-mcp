@@ -31,7 +31,9 @@ class Config:
         user_creds = _read_env_file(CREDENTIALS_FILE)
 
         # Determine environment: credentials > env var > default (production)
-        env = user_creds.get("ODOO_ENV") or os.environ.get("ODOO_ENV", "production")
+        # Track whether ODOO_ENV was explicitly set (vs defaulting to production)
+        _explicit_env = user_creds.get("ODOO_ENV") or os.environ.get("ODOO_ENV")
+        env = _explicit_env or "production"
         if env == "production":
             shared_file = CONFIG_DIR / "shared.env"
         else:
@@ -44,10 +46,12 @@ class Config:
         # Layer 2: Shared config from repo (public values)
         shared = _read_env_file(shared_file)
 
-        # Layer 3: Environment variables (fallback)
-        # Priority: user_creds > shared > env vars
+        # Layer 3: Environment variables (highest priority when set)
+        # Priority: env vars > user_creds > shared
+        # This allows agent-vault, Docker, CI, etc. to inject secrets
+        # without needing the credentials file.
         def _get(key: str) -> str:
-            return user_creds.get(key) or shared.get(key) or os.environ.get(key, "")
+            return os.environ.get(key) or user_creds.get(key) or shared.get(key) or ""
 
         # Odoo (URL/DB from shared, login/key from user)
         self.odoo_url = _get("ODOO_URL").rstrip("/")
@@ -56,9 +60,10 @@ class Config:
         self.odoo_api_key = _get("ODOO_API_KEY")
 
         # Determine effective environment:
-        # If user set ODOO_ENV explicitly, use that.
+        # If ODOO_ENV was explicitly set (credentials file, env var, agent-vault),
+        # use it directly — no URL heuristic needed.
         # Otherwise, detect by comparing URL to production shared.env.
-        if env != "production":
+        if _explicit_env:
             self.environment = env
         else:
             prod_url = shared.get("ODOO_URL", "").rstrip("/")

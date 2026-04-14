@@ -138,57 +138,21 @@ def create_server() -> FastMCP:
 
     @mcp.tool()
     def odoo_switch_env(environment: str) -> str:
-        """Switch the MCP to a different Odoo environment (e.g. 'staging', 'production').
-        After switching, the MCP must be restarted with /mcp for changes to take effect.
+        """[DEPRECATED] Switch environment is no longer needed.
+
+        Use dual MCP instances instead — one for production, one for staging.
+        Each instance gets its environment via ODOO_ENV (env var or credentials file).
 
         Args:
-            environment: Target environment name ('production' or 'staging')
+            environment: Ignored (deprecated)
         """
-        from .config import CONFIG_DIR, CREDENTIALS_FILE, _read_env_file
-
-        # Validate environment exists
-        if environment == "production":
-            target = CONFIG_DIR / "shared.env"
-        else:
-            target = CONFIG_DIR / f"shared.{environment}.env"
-
-        if not target.exists():
-            available = [
-                f.stem.replace("shared.", "").replace(".env", "") or "production"
-                for f in sorted(CONFIG_DIR.glob("shared*.env"))
-            ]
-            return _serialize({
-                "error": f"Environment '{environment}' not found",
-                "available": available,
-            })
-
-        # Read current credentials, update ODOO_ENV, remove URL/DB overrides
-        creds = _read_env_file(CREDENTIALS_FILE)
-
-        if environment == "production":
-            creds.pop("ODOO_ENV", None)
-        else:
-            creds["ODOO_ENV"] = environment
-
-        # Remove URL/DB overrides so shared.env takes effect
-        creds.pop("ODOO_URL", None)
-        creds.pop("ODOO_DB", None)
-
-        # Write back
-        lines = []
-        for key, value in creds.items():
-            lines.append(f"{key}={value}")
-
-        CREDENTIALS_FILE.write_text("\n".join(lines) + "\n")
-
-        # Read target env to show what it will connect to
-        target_config = _read_env_file(target)
-
         return _serialize({
-            "switched_to": environment,
-            "odoo_url": target_config.get("ODOO_URL", "from credentials"),
-            "odoo_db": target_config.get("ODOO_DB", "from credentials"),
-            "action_required": "Reinicia el MCP con /mcp para que los cambios tomen efecto.",
+            "deprecated": True,
+            "message": (
+                "odoo_switch_env is deprecated. Use dual MCP instances instead: "
+                "configure one MCP with ODOO_ENV=production and another with "
+                "ODOO_ENV=staging. See README for setup instructions."
+            ),
         })
 
     # ── Read-only tools (all roles) ─────────────────────────────────────
