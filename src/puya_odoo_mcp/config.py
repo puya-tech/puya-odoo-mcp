@@ -38,13 +38,11 @@ class Config:
             shared_file = CONFIG_DIR / "shared.env"
         else:
             shared_file = CONFIG_DIR / f"shared.{env}.env"
-            if not shared_file.exists():
-                raise ConfigError(
-                    f"Environment '{env}' config not found: {shared_file}"
-                )
 
         # Layer 2: Shared config from repo (public values)
-        shared = _read_env_file(shared_file)
+        # Optional — when running via pip install or Docker, these files
+        # may not exist. Env vars alone are sufficient.
+        shared = _read_env_file(shared_file) if shared_file.exists() else {}
 
         # Layer 3: Environment variables (highest priority when set)
         # Priority: env vars > user_creds > shared
