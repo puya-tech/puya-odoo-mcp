@@ -9,6 +9,7 @@ from .config import Config
 from .odoo_client import OdooClient, OdooError
 from .rbac import PermissionDenied, RBACEngine
 from .telegram import TelegramNotifier
+from .slack import SlackNotifier
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("puya_odoo_mcp")
@@ -98,6 +99,30 @@ def create_server() -> FastMCP:
         bot_token=config.telegram_bot_token or None,
         chat_id=config.telegram_chat_id or None,
     )
+    slack_notifier = SlackNotifier(
+        bot_token=config.slack_bot_token or None,
+        channel=config.slack_approval_channel or None,
+    )
+
+    def notify_approval(pending_id: int, action: str, model: str,
+                        record_count: int, preview: str,
+                        reason: str | None = None) -> tuple[str | int | None, str]:
+        """Send approval notification to configured channel. Returns (msg_id, channel_type)."""
+        if config.approval_channel == "slack" and slack_notifier.enabled:
+            msg_id = slack_notifier.send_approval_request(
+                pending_id=pending_id, user=username, role=role,
+                action=action, model=model, record_count=record_count,
+                preview=preview, reason=reason,
+            )
+            return msg_id, "slack"
+        elif telegram.enabled:
+            msg_id = telegram.send_approval_request(
+                pending_id=pending_id, user=username, role=role,
+                action=action, model=model, record_count=record_count,
+                preview=preview, reason=reason,
+            )
+            return msg_id, "telegram"
+        return None, "none"
 
     massive_threshold = rbac.massive_threshold
     expiry_minutes = rbac.pending_expiry_minutes
@@ -133,7 +158,9 @@ def create_server() -> FastMCP:
             "uid": uid,
             "available_environments": available_envs,
             "supabase_connected": bool(config.supabase_url and config.supabase_key),
+            "approval_channel": config.approval_channel,
             "telegram_connected": bool(config.telegram_bot_token and config.telegram_chat_id),
+            "slack_connected": bool(config.slack_bot_token and config.slack_approval_channel),
         })
 
     @mcp.tool()
@@ -351,25 +378,25 @@ def create_server() -> FastMCP:
             )
 
             if needs_approval:
-                # Send approval request to Telegram
-                tg_msg_id = telegram.send_approval_request(
-                    pending_id=pending_id, user=username, role=role,
-                    action="write", model=model, record_count=len(ids),
-                    preview=preview, reason=reason,
+                # Send approval request to configured channel
+                msg_id, channel_type = notify_approval(
+                    pending_id=pending_id, action="write", model=model,
+                    record_count=len(ids), preview=preview, reason=reason,
                 )
-                if tg_msg_id:
-                    audit.update_pending_telegram_id(pending_id, tg_msg_id)
+                if msg_id:
+                    audit.update_pending_telegram_id(pending_id, msg_id)
 
                 return _serialize({
-                    "status": "BLOQUEADO — solicitud enviada a Telegram para aprobacion",
+                    "status": f"BLOQUEADO — solicitud enviada a {channel_type} para aprobacion",
                     "pending_id": pending_id,
                     "is_massive": True,
                     "record_count": len(ids),
                     "massive_threshold": massive_threshold,
                     "preview": preview,
-                    "telegram_notified": tg_msg_id is not None,
+                    "notified": msg_id is not None,
+                    "notification_channel": channel_type,
                     "instructions": "Muestra el preview al usuario. La solicitud fue enviada "
-                    "al grupo de aprobaciones en Telegram. El usuario puede cerrar la sesion — "
+                    f"al grupo de aprobaciones en {channel_type}. El usuario puede cerrar la sesion — "
                     "sera notificado cuando se apruebe o rechace.",
                 })
 
@@ -451,25 +478,24 @@ def create_server() -> FastMCP:
             )
 
             if needs_approval:
-                tg_msg_id = telegram.send_approval_request(
-                    pending_id=pending_id, user=username, role=role,
-                    action=f"execute:{method}", model=model,
-                    record_count=len(record_ids),
-                    preview=preview, reason=reason,
+                msg_id, channel_type = notify_approval(
+                    pending_id=pending_id, action=f"execute:{method}", model=model,
+                    record_count=len(record_ids), preview=preview, reason=reason,
                 )
-                if tg_msg_id:
-                    audit.update_pending_telegram_id(pending_id, tg_msg_id)
+                if msg_id:
+                    audit.update_pending_telegram_id(pending_id, msg_id)
 
                 return _serialize({
-                    "status": "BLOQUEADO — solicitud enviada a Telegram para aprobacion",
+                    "status": f"BLOQUEADO — solicitud enviada a {channel_type} para aprobacion",
                     "pending_id": pending_id,
                     "is_massive": True,
                     "record_count": len(record_ids),
                     "massive_threshold": massive_threshold,
                     "preview": preview,
-                    "telegram_notified": tg_msg_id is not None,
+                    "notified": msg_id is not None,
+                    "notification_channel": channel_type,
                     "instructions": "Muestra el preview al usuario. La solicitud fue enviada "
-                    "al grupo de aprobaciones en Telegram. El usuario puede cerrar la sesion — "
+                    f"al grupo de aprobaciones en {channel_type}. El usuario puede cerrar la sesion — "
                     "sera notificado cuando se apruebe o rechace.",
                 })
 
@@ -635,24 +661,24 @@ def create_server() -> FastMCP:
             )
 
             if needs_approval:
-                tg_msg_id = telegram.send_approval_request(
-                    pending_id=pending_id, user=username, role=role,
-                    action="delete", model=model, record_count=len(ids),
-                    preview=preview, reason=reason,
+                msg_id, channel_type = notify_approval(
+                    pending_id=pending_id, action="delete", model=model,
+                    record_count=len(ids), preview=preview, reason=reason,
                 )
-                if tg_msg_id:
-                    audit.update_pending_telegram_id(pending_id, tg_msg_id)
+                if msg_id:
+                    audit.update_pending_telegram_id(pending_id, msg_id)
 
                 return _serialize({
-                    "status": "BLOQUEADO — solicitud enviada a Telegram para aprobacion",
+                    "status": f"BLOQUEADO — solicitud enviada a {channel_type} para aprobacion",
                     "pending_id": pending_id,
                     "is_massive": True,
                     "record_count": len(ids),
                     "massive_threshold": massive_threshold,
                     "preview": preview,
-                    "telegram_notified": tg_msg_id is not None,
+                    "notified": msg_id is not None,
+                    "notification_channel": channel_type,
                     "instructions": "Muestra el preview al usuario. La solicitud fue enviada "
-                    "al grupo de aprobaciones en Telegram. El usuario puede cerrar la sesion — "
+                    f"al grupo de aprobaciones en {channel_type}. El usuario puede cerrar la sesion — "
                     "sera notificado cuando se apruebe o rechace.",
                 })
 

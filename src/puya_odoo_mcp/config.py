@@ -89,6 +89,13 @@ class Config:
         self.telegram_bot_token = _get("TELEGRAM_BOT_TOKEN")
         self.telegram_chat_id = _get("TELEGRAM_CHAT_ID")
 
+        # Slack (for approvals — alternative to Telegram)
+        self.slack_bot_token = _get("SLACK_BOT_TOKEN")
+        self.slack_approval_channel = _get("SLACK_APPROVAL_CHANNEL")
+
+        # Approval channel: slack if configured, otherwise telegram
+        self.approval_channel = "slack" if self.slack_bot_token and self.slack_approval_channel else "telegram"
+
         # Validate required Odoo config
         missing = []
         if not self.odoo_url:
