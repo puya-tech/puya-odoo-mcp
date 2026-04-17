@@ -6,11 +6,23 @@ settings:
 
 roles:
   vendedor:
-    # Read access to ALL models (open exploration)
-    # Only infra/secret models are blocked (hardcoded in rbac.py)
+    # Read + write/create on business models, but ALL mutations require approval
+    always_approve: true
     models:
       "*":
         operations: [search_read]
+      res.partner:
+        operations: [search_read, write, create]
+      sale.order:
+        operations: [search_read, write, create]
+      sale.order.line:
+        operations: [search_read, write, create]
+      product.product:
+        operations: [search_read, write]
+      product.template:
+        operations: [search_read, write]
+      stock.picking:
+        operations: [search_read, write]
     methods_allowed: []
     blocked_models: []
     rate_limit: 60

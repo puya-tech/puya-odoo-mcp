@@ -364,7 +364,7 @@ def create_server() -> FastMCP:
             is_massive = len(ids) > massive_threshold
             preview = _build_write_preview(model, old_records, values)
 
-            needs_approval = is_massive and role != "developer"
+            needs_approval = rbac.always_approve(role) or (is_massive and role != "developer")
             status = "approval_required" if needs_approval else "pending"
 
             pending_id = audit.create_pending(
@@ -463,7 +463,7 @@ def create_server() -> FastMCP:
             record_ids = args[0] if args and isinstance(args[0], list) else []
             is_massive = len(record_ids) > massive_threshold
             preview = _build_execute_preview(model, method, record_ids)
-            needs_approval = is_massive and role != "developer"
+            needs_approval = rbac.always_approve(role) or (is_massive and role != "developer")
             status = "approval_required" if needs_approval else "pending"
 
             pending_id = audit.create_pending(
@@ -647,7 +647,7 @@ def create_server() -> FastMCP:
 
             is_massive = len(ids) > massive_threshold
             preview = _build_delete_preview(model, old_records)
-            needs_approval = is_massive and role != "developer"
+            needs_approval = rbac.always_approve(role) or (is_massive and role != "developer")
             status = "approval_required" if needs_approval else "pending"
 
             pending_id = audit.create_pending(

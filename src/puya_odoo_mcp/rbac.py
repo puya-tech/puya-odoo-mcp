@@ -135,3 +135,8 @@ class RBACEngine:
     def get_rate_limit(self, role: str) -> int:
         config = self._get_role_config(role)
         return config.get("rate_limit", 60)
+
+    def always_approve(self, role: str) -> bool:
+        """Check if this role requires approval for ALL mutations."""
+        config = self._get_role_config(role)
+        return config.get("always_approve", False)
