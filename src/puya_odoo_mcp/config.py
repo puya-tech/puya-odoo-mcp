@@ -3,7 +3,10 @@ from pathlib import Path
 
 CREDENTIALS_DIR = Path.home() / ".config" / "puya-odoo-mcp"
 CREDENTIALS_FILE = CREDENTIALS_DIR / "credentials"
-CONFIG_DIR = Path(__file__).parent.parent.parent / "config"
+# Look inside the package first (pip install), fall back to repo root (dev)
+_pkg_config = Path(__file__).parent / "config"
+_repo_config = Path(__file__).parent.parent.parent / "config"
+CONFIG_DIR = _pkg_config if _pkg_config.exists() else _repo_config
 
 
 class ConfigError(Exception):

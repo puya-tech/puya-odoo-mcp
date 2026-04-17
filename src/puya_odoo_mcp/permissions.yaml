@@ -1,0 +1,54 @@
+settings:
+  # Actions affecting more than this many records require approval
+  massive_threshold: 10
+  # Pending actions expire after this many minutes
+  pending_expiry_minutes: 10
+
+roles:
+  vendedor:
+    # Read access to ALL models (open exploration)
+    # Only infra/secret models are blocked (hardcoded in rbac.py)
+    models:
+      "*":
+        operations: [search_read]
+    methods_allowed: []
+    blocked_models: []
+    rate_limit: 60
+
+  administrativo:
+    models:
+      # Open read for all models
+      "*":
+        operations: [search_read]
+      # Write/create on business models
+      res.partner:
+        operations: [search_read, write, create]
+      sale.order:
+        operations: [search_read, write, create]
+      sale.order.line:
+        operations: [search_read, write, create]
+      account.move:
+        operations: [search_read, write, create]
+      account.payment:
+        operations: [search_read, write, create]
+      stock.picking:
+        operations: [search_read, write]
+      product.product:
+        operations: [search_read, write]
+      product.template:
+        operations: [search_read, write]
+      purchase.order:
+        operations: [search_read]
+    methods_allowed:
+      - "sale.order:action_confirm"
+      - "account.move:action_post"
+      - "account.payment:action_post"
+    blocked_models: []
+    rate_limit: 120
+
+  developer:
+    models:
+      "*":
+        operations: [search_read, write, create, unlink]
+    methods_allowed: ["*"]
+    rate_limit: 300

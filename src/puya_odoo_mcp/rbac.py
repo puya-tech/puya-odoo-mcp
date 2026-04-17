@@ -43,7 +43,10 @@ PROTECTED_FIELDS = frozenset([
 class RBACEngine:
     def __init__(self, permissions_path: str | Path | None = None):
         if permissions_path is None:
-            permissions_path = Path(__file__).parent.parent.parent / "permissions.yaml"
+            # Look inside the package first (pip install), fall back to repo root (dev)
+            pkg_path = Path(__file__).parent / "permissions.yaml"
+            repo_path = Path(__file__).parent.parent.parent / "permissions.yaml"
+            permissions_path = pkg_path if pkg_path.exists() else repo_path
         with open(permissions_path) as f:
             data = yaml.safe_load(f)
         self._roles = data.get("roles", {})
