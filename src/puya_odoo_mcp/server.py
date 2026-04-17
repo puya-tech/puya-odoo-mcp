@@ -323,9 +323,16 @@ def create_server() -> FastMCP:
         audit.log("fields_get", model, {}, duration)
         return _serialize(result)
 
-    # ── Mutation tools (admin and developer) — two-phase: preview → confirm
+    # ── Mutation tools — two-phase: preview → confirm
+    # Exposed for any role that has write/create in permissions.yaml
+    # For roles with always_approve=true, ALL mutations go through approval
 
-    if role in ("administrativo", "developer"):
+    has_write_perms = any(
+        "write" in m.get("operations", []) or "create" in m.get("operations", [])
+        for m in rbac._get_role_config(role).get("models", {}).values()
+    )
+
+    if has_write_perms:
 
         @mcp.tool()
         def odoo_write(model: str, ids: list, values: dict, reason: str | None = None) -> str:
