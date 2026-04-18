@@ -82,8 +82,8 @@ class Config:
                 self.environment = "production"
 
         # Supabase (URL from shared, service key from user)
-        self.supabase_url = _get("SUPABASE_URL").rstrip("/")
-        self.supabase_key = _get("SUPABASE_SERVICE_KEY")
+        self.supabase_url = _get("SUPABASE_URL").strip().rstrip("/")
+        self.supabase_key = _get("SUPABASE_SERVICE_KEY").strip()
 
         # Telegram (chat_id from shared, bot token from user)
         self.telegram_bot_token = _get("TELEGRAM_BOT_TOKEN")
