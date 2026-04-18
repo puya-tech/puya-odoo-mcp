@@ -727,4 +727,47 @@ def create_server() -> FastMCP:
             model=model, action=action, user=user_login, limit=limit,
         ))
 
+    # ── Past sessions tool (all roles) ────────────────────────────────
+
+    @mcp.tool()
+    def puyol_past_sessions(
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        channel_type: str | None = None,
+        channel_id: str | None = None,
+        thread_id: str | None = None,
+        limit: int = 5,
+        offset: int = 0,
+    ) -> str:
+        """Consulta sesiones archivadas previas de Puyol. Agnostica al canal.
+
+        Usar cuando:
+        - Ves un record de Odoo y queres saber si hubo conversaciones previas
+          sobre el (filtra por entity_type + entity_id).
+        - Estas en un hilo de Slack/Odoo y queres saber si hubo sesiones pasadas
+          archivadas en el mismo hilo (filtra por channel_type + channel_id + thread_id).
+
+        Devuelve lista de sesiones archivadas ordenadas por fecha descendente,
+        con summary_text (breve) y summary_data (estructurado con acciones y decisiones).
+
+        Args:
+            entity_type: Tipo de entidad de Odoo (purchase.order, sale.order, etc.)
+            entity_id: ID del record
+            channel_type: slack, odoo_chatter, api, etc.
+            channel_id: ID del canal en su sistema
+            thread_id: ID del hilo (thread_ts en slack, record_id en chatter)
+            limit: Max sesiones a devolver (default 5)
+            offset: Saltar N resultados (paginar hacia atras)
+        """
+        result = audit.query_past_sessions(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            channel_type=channel_type,
+            channel_id=channel_id,
+            thread_id=thread_id,
+            limit=limit,
+            offset=offset,
+        )
+        return _serialize(result)
+
     return mcp

@@ -114,6 +114,46 @@ class AuditLogger:
         result = self._request("GET", self._table, params="&".join(params))
         return result if isinstance(result, list) else []
 
+    def query_past_sessions(
+        self,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        channel_type: str | None = None,
+        channel_id: str | None = None,
+        thread_id: str | None = None,
+        limit: int = 5,
+        offset: int = 0,
+    ) -> list:
+        """Query archived agent sessions. Channel-agnostic.
+
+        Filter by entity (entity_type + entity_id) or by channel/thread.
+        Returns archived sessions with summary_text and summary_data.
+        """
+        if not self._enabled:
+            return []
+
+        params = [
+            "status=eq.archived",
+            "order=archived_at.desc",
+            f"limit={limit}",
+            f"offset={offset}",
+            "select=id,channel_type,channel_id,thread_id,business_entity_type,"
+            "business_entity_id,created_at,archived_at,summary_text,summary_data,participants",
+        ]
+        if entity_type:
+            params.append(f"business_entity_type=eq.{entity_type}")
+        if entity_id:
+            params.append(f"business_entity_id=eq.{entity_id}")
+        if channel_type:
+            params.append(f"channel_type=eq.{channel_type}")
+        if channel_id:
+            params.append(f"channel_id=eq.{channel_id}")
+        if thread_id:
+            params.append(f"thread_id=eq.{thread_id}")
+
+        result = self._request("GET", "agent_sessions", params="&".join(params))
+        return result if isinstance(result, list) else []
+
     def mark_reverted(self, audit_id: int, reverted_by: str) -> bool:
         """Mark an audit entry as reverted."""
         if not self._enabled:
