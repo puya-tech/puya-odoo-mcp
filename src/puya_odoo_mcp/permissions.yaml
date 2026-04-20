@@ -6,11 +6,13 @@ settings:
 
 roles:
   vendedor:
-    # Read + write/create on business models, but ALL mutations require approval
+    # Read + write/create on ALL models (con INFRA_BLOCKED_MODELS hardcoded
+    # excluido). Toda mutación pasa por aprobación humana en Slack
+    # (always_approve). unlink queda fuera por seguridad.
     always_approve: true
     models:
       "*":
-        operations: [search_read]
+        operations: [search_read, write, create]
       res.partner:
         operations: [search_read, write, create]
       sale.order:
