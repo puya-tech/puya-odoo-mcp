@@ -36,9 +36,18 @@ class SlackNotifier:
 
     def send_approval_request(self, pending_id: int, user: str, role: str,
                               action: str, model: str, record_count: int,
-                              preview: str, reason: str | None = None) -> str | None:
+                              preview: str, reason: str | None = None,
+                              target_env: str | None = None) -> str | None:
         """Send an approval request to the Slack channel. Returns message ts."""
         reason_line = f"\n:memo: Razón: \"{reason}\"" if reason else ""
+
+        # Badge de entorno (staging/producción)
+        if target_env == "production":
+            env_badge = ":large_green_circle: *PRODUCCIÓN*"
+        elif target_env:
+            env_badge = f":warning: *{target_env.upper()}*"
+        else:
+            env_badge = ":grey_question: *entorno desconocido*"
 
         # Truncate preview for Slack
         if len(preview) > 1500:
@@ -46,6 +55,7 @@ class SlackNotifier:
 
         text = (
             f":clipboard: *Solicitud de aprobación #{pending_id}*\n"
+            f"{env_badge}\n"
             f"\n"
             f":bust_in_silhouette: Solicitante: {user} ({role}){reason_line}\n"
             f"\n"

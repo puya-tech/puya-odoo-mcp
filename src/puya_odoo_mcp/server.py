@@ -113,6 +113,7 @@ def create_server() -> FastMCP:
                 pending_id=pending_id, user=username, role=role,
                 action=action, model=model, record_count=record_count,
                 preview=preview, reason=reason,
+                target_env=config.environment,
             )
             return msg_id, "slack"
         elif telegram.enabled:
@@ -379,7 +380,13 @@ def create_server() -> FastMCP:
                 old_values=old_records, new_values=values,
                 preview=preview, is_massive=is_massive,
                 record_count=len(ids),
-                details={"fields": changed_fields, "reason": reason},
+                details={
+                    "fields": changed_fields,
+                    "reason": reason,
+                    "target_env": config.environment,
+                    "odoo_url": config.odoo_url,
+                    "odoo_db": config.odoo_db,
+                },
                 expiry_minutes=expiry_minutes,
                 status=status,
             )
@@ -441,6 +448,11 @@ def create_server() -> FastMCP:
                 old_values=None, new_values=values,
                 preview=preview, is_massive=False,
                 record_count=1,
+                details={
+                    "target_env": config.environment,
+                    "odoo_url": config.odoo_url,
+                    "odoo_db": config.odoo_db,
+                },
                 expiry_minutes=expiry_minutes,
             )
 
@@ -479,7 +491,13 @@ def create_server() -> FastMCP:
                 new_values={"method": method, "args": args or [], "kwargs": kwargs},
                 preview=preview, is_massive=is_massive,
                 record_count=len(record_ids),
-                details={"method": method, "reason": reason},
+                details={
+                    "method": method,
+                    "reason": reason,
+                    "target_env": config.environment,
+                    "odoo_url": config.odoo_url,
+                    "odoo_db": config.odoo_db,
+                },
                 expiry_minutes=expiry_minutes,
                 status=status,
             )
@@ -662,7 +680,12 @@ def create_server() -> FastMCP:
                 old_values=old_records, new_values=None,
                 preview=preview, is_massive=is_massive,
                 record_count=len(ids),
-                details={"reason": reason},
+                details={
+                    "reason": reason,
+                    "target_env": config.environment,
+                    "odoo_url": config.odoo_url,
+                    "odoo_db": config.odoo_db,
+                },
                 expiry_minutes=expiry_minutes,
                 status=status,
             )
